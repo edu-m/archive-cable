@@ -7,7 +7,9 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.view.GestureDetector
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -18,6 +20,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import android.widget.FrameLayout
 import android.widget.Toast
+import kotlin.math.abs
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -111,6 +114,30 @@ class MainActivity : Activity() {
         if (hasFocus) hideSystemBars()
     }
 
+    /**
+     * Touch screens (phones/tablets), mirroring the remote: tap = guide (OK), swipe up/down = channel,
+     * swipe left/right = -15/+15 s, long-press = channel banner.
+     */
+    private val liveGestures by lazy {
+        GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
+            override fun onDown(e: MotionEvent) = true
+            override fun onSingleTapUp(e: MotionEvent): Boolean {
+                openGuide()
+                return true
+            }
+            override fun onLongPress(e: MotionEvent) = showOsd()
+            override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+                val dx = e2.x - (e1?.x ?: e2.x)
+                val dy = e2.y - (e1?.y ?: e2.y)
+                val min = 0.06f * root.height
+                if (maxOf(abs(dx), abs(dy)) < min) return false
+                if (abs(dx) > abs(dy)) seek(if (dx > 0) SEEK_MS else -SEEK_MS)
+                else tune(nextChannel(if (dy < 0) 1 else -1))
+                return true
+            }
+        })
+    }
+
     private fun handleBack() {
         if (guide.isOpen) guide.handleKey(KeyEvent.KEYCODE_BACK) else onBack()
     }
@@ -151,6 +178,7 @@ class MainActivity : Activity() {
         osd = OsdView(this)
         frame.addView(osd, match())
         setContentView(root)
+        root.setOnTouchListener { _, ev -> !guide.isOpen && liveGestures.onTouchEvent(ev) }
         root.addOnLayoutChangeListener { _, l, t, r, b, ol, ot, or, ob ->
             if (r - l != or - ol || b - t != ob - ot) root.post { applyGeometry() }
         }
@@ -240,11 +268,14 @@ class MainActivity : Activity() {
         val rw = root.width
         val rh = root.height
         if (rw == 0 || rh == 0) return
-        val w = (rw * overscan / 100f).toInt()
-        val h = (rh * overscan / 100f).toInt()
+        // The UI is drawn for 16:9: on wider (phones) or taller (tablets) screens, keep a 16:9 box.
+        val baseW = if (rw * 9 > rh * 16) rh * 16 / 9 else rw
+        val baseH = if (rw * 9 > rh * 16) rh else rw * 9 / 16
+        val w = (baseW * overscan / 100f).toInt()
+        val h = (baseH * overscan / 100f).toInt()
         frame.layoutParams = FrameLayout.LayoutParams(w, h, Gravity.TOP or Gravity.START).apply {
-            leftMargin = (rw - w) / 2 + (rw * offsetX / 1000f).toInt()
-            topMargin = (rh - h) / 2 + (rh * offsetY / 1000f).toInt()
+            leftMargin = (rw - w) / 2 + (baseW * offsetX / 1000f).toInt()
+            topMargin = (rh - h) / 2 + (baseH * offsetY / 1000f).toInt()
         }
         if (guide.isOpen) layoutPreview(w, h)
         updateOverscan()
@@ -362,7 +393,8 @@ class MainActivity : Activity() {
         playable = p
         android.util.Log.i("ArchiveCable", "playLive seamless=$seamless at=${Retro.longTime(at)} -> " +
             when (p) {
-                is Playable.Media -> "${if (p.isFiller) "filler" else "program"} '${p.program.title}' pos=${p.positionMs / 1000}s"
+                is Playable.Media -> "${if (p.isFiller) "filler" else "program"} '${p.program.title}' pos=${p.positionMs / 1000}s/" +
+                    "${((p.clipEndMs ?: p.program.durationMs) - p.clipStartMs) / 1000}s"
                 is Playable.StandBy -> "standby"
             })
         if (seamless && settings.transitions && p is Playable.Media) {
@@ -427,7 +459,8 @@ class MainActivity : Activity() {
     private fun onTick() {
         val now = System.currentTimeMillis()
         val p = playable
-        if (p is Playable.StandBy && now >= p.untilMs) playLive(now)
+        // Still the same channel: continue seamlessly so the next show gets its ident.
+        if (p is Playable.StandBy && now >= p.untilMs) playLive(maxOf(now, p.untilMs + 50), seamless = true)
         if (waitingForFrame && SystemClock.elapsedRealtime() - tuneStartedAt > FIRST_FRAME_TIMEOUT_MS) {
             (p as? Playable.Media)?.let { badUrls += it.program.url }
             waitingForFrame = false

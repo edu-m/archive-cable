@@ -8,7 +8,9 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.text.Layout
 import android.text.StaticLayout
+import android.view.GestureDetector
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 
 /**
@@ -41,6 +43,31 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
     private var setupPending: SetupValues? = null
     private var setupRow = 0
     private var setupTop = 0
+
+    // ---- Touch (phones/tablets) ---------------------------------------------------------------
+    /** True after a touch, false after a remote key: switches hints and shows on-screen buttons. */
+    private var touchMode = false
+    private class Hit(val rect: RectF, val row: Int, val start: Long)
+    private val hits = ArrayList<Hit>()
+    private val setupRowRects = ArrayList<Pair<Int, RectF>>()
+    private var setupBox = RectF()
+    private var saveButton = RectF()
+    private var cancelButton = RectF()
+
+    private val gestures = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+        override fun onDown(e: MotionEvent) = true
+        override fun onSingleTapUp(e: MotionEvent): Boolean {
+            onTap(e.x * 1920f / width, e.y * 1080f / height)
+            return true
+        }
+        override fun onFling(e1: MotionEvent?, e2: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
+            val dx = (e2.x - (e1?.x ?: e2.x)) * 1920f / width
+            val dy = (e2.y - (e1?.y ?: e2.y)) * 1080f / height
+            if (maxOf(kotlin.math.abs(dx), kotlin.math.abs(dy)) < SWIPE_MIN) return false
+            onSwipe(dx, dy)
+            return true
+        }
+    })
 
     private var leftBumps = 0
     private var lastLeftBump = 0L
@@ -164,8 +191,76 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
 
     private fun selectedCell(): Cell? = channels.getOrNull(selRow)?.let { ch -> repo.schedule(ch.id)?.let { cellAt(ch, it, selTime) } }
 
+    @android.annotation.SuppressLint("ClickableViewAccessibility")
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (!isOpen) return false
+        if (!touchMode) { touchMode = true; invalidate() }
+        gestures.onTouchEvent(event)
+        return true
+    }
+
+    private fun onTap(x: Float, y: Float) {
+        if (pickerOpen) {
+            when {
+                saveButton.contains(x, y) -> handlePickerKey(KeyEvent.KEYCODE_ENTER)
+                cancelButton.contains(x, y) -> handlePickerKey(KeyEvent.KEYCODE_BACK)
+                !setupBox.contains(x, y) -> handlePickerKey(KeyEvent.KEYCODE_BACK)
+                else -> setupRowRects.firstOrNull { it.second.contains(x, y) }?.let { (row, r) ->
+                    if (row != setupRow) setupRow = row
+                    else handlePickerKey(if (x < r.centerX()) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT)
+                }
+            }
+            invalidate()
+            return
+        }
+        if (PREVIEW.contains(x, y)) { onTune?.invoke(selRow); return }
+        val hit = hits.lastOrNull { it.rect.contains(x, y) } ?: return
+        val now = System.currentTimeMillis()
+        if (hit.start < 0) {
+            // Channel name: tap once to select the row, again to watch it.
+            if (hit.row == selRow) { onTune?.invoke(hit.row); return }
+            selRow = hit.row
+            selTime = now
+        } else {
+            // Program: tap once to see its details, again to watch the channel.
+            if (hit.row == selRow && selectedCell()?.start == hit.start) { onTune?.invoke(hit.row); return }
+            selRow = hit.row
+            selTime = maxOf(hit.start, now)
+            ensureVisible()
+        }
+        invalidate()
+    }
+
+    private fun onSwipe(dx: Float, dy: Float) {
+        val horizontal = kotlin.math.abs(dx) > kotlin.math.abs(dy)
+        if (pickerOpen) {
+            if (horizontal) handlePickerKey(if (dx < 0) KeyEvent.KEYCODE_DPAD_LEFT else KeyEvent.KEYCODE_DPAD_RIGHT)
+            else repeat(3) { handlePickerKey(if (dy < 0) KeyEvent.KEYCODE_DPAD_DOWN else KeyEvent.KEYCODE_DPAD_UP) }
+        } else if (horizontal) {
+            if (dx < 0) openSetup() else {
+                val now = System.currentTimeMillis()
+                selTime = now
+                windowStart = Retro.floorToHalfHour(now)
+            }
+        } else {
+            moveRow(if (dy < 0) 3 else -3) // finger up scrolls down the channel list
+        }
+        invalidate()
+    }
+
+    private fun openSetup() {
+        setupProvider?.invoke()?.let {
+            setupOriginal = it
+            setupPending = it
+            setupRow = 0
+            setupTop = 0
+            pickerOpen = true
+        }
+    }
+
     fun handleKey(keyCode: Int): Boolean {
         val now = System.currentTimeMillis()
+        if (touchMode) touchMode = false
         if (pickerOpen) return handlePickerKey(keyCode)
         if (keyCode != KeyEvent.KEYCODE_DPAD_LEFT) leftBumps = 0
         when (keyCode) {
@@ -189,13 +284,7 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
                     lastLeftBump = now
                     if (leftBumps >= 3) {
                         leftBumps = 0
-                        setupProvider?.invoke()?.let {
-                            setupOriginal = it
-                            setupPending = it
-                            setupRow = 0
-                            setupTop = 0
-                            pickerOpen = true
-                        }
+                        openSetup()
                     }
                 } else leftBumps = 0
             }
@@ -293,8 +382,11 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
         val rowStep = 74f
         if (setupRow < setupTop) setupTop = setupRow
         if (setupRow >= setupTop + VISIBLE_SETUP_ROWS) setupTop = setupRow - VISIBLE_SETUP_ROWS + 1
-        val h = 290f + VISIBLE_SETUP_ROWS * rowStep
+        val buttonsH = if (touchMode) 84f else 0f
+        val h = 290f + VISIBLE_SETUP_ROWS * rowStep + buttonsH
         val box = RectF(960 - w / 2, 540 - h / 2, 960 + w / 2, 540 + h / 2)
+        setupBox = box
+        setupRowRects.clear()
         fill.color = if (geometry) 0x66000000 else 0xAA000000.toInt()
         c.drawRect(0f, 0f, 1920f, 1080f, fill)
         if (geometry) drawCalibration(c)
@@ -321,6 +413,7 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
             if (i < setupTop || i >= setupTop + VISIBLE_SETUP_ROWS) return@forEachIndexed
             val top = header.bottom + 20 + (i - setupTop) * rowStep
             val r = RectF(box.left + 30, top, box.right - 30, top + 64)
+            setupRowRects += i to r
             val sel = i == setupRow
             if (sel) Retro.bevel(c, r, Retro.YELLOW, 0xFFFFF2A8.toInt(), 0xFF9C7E00.toInt())
             else Retro.bevel(c, r, Retro.CELL, Retro.CELL_LIGHT, Retro.CELL_SHADOW)
@@ -339,8 +432,23 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
             ROW_OFFSET_X, ROW_OFFSET_Y -> I18n.t("offset_hint")
             else -> I18n.t("decades_hint")
         }
-        c.drawText(hint, box.left + 40, box.bottom - 106, Retro.textPaint(context, 34f, Retro.CYAN))
-        c.drawText(I18n.t("setup_hint"), box.left + 40, box.bottom - 64, hintText)
+        c.drawText(hint, box.left + 40, box.bottom - 106 - buttonsH, Retro.textPaint(context, 34f, Retro.CYAN))
+        if (touchMode) {
+            // On-screen buttons for touch screens (a remote uses OK / BACK instead).
+            val bTop = box.bottom - 76 - buttonsH
+            cancelButton = RectF(box.left + 30, bTop, 960f - 10f, bTop + 70)
+            saveButton = RectF(960f + 10f, bTop, box.right - 30, bTop + 70)
+            Retro.bevel(c, cancelButton, Retro.CELL, Retro.CELL_LIGHT, Retro.CELL_SHADOW)
+            Retro.bevel(c, saveButton, Retro.YELLOW, 0xFFFFF2A8.toInt(), 0xFF9C7E00.toInt())
+            cellText.textSize = 42f; cellTextSel.textSize = 42f
+            c.drawText(I18n.t("cancel"), cancelButton.centerX() - cellText.measureText(I18n.t("cancel")) / 2, cancelButton.bottom - 22, cellText)
+            c.drawText(I18n.t("save"), saveButton.centerX() - cellTextSel.measureText(I18n.t("save")) / 2, saveButton.bottom - 22, cellTextSel)
+            cellText.textSize = 38f; cellTextSel.textSize = 38f
+            c.drawText(I18n.t("setup_hint_touch"), box.left + 40, box.bottom - 54, hintText)
+        } else {
+            cancelButton = RectF(); saveButton = RectF()
+            c.drawText(I18n.t("setup_hint"), box.left + 40, box.bottom - 64, hintText)
+        }
         val about = Retro.textPaint(context, 30f, 0xFF8090B8.toInt())
         c.drawText(Retro.ellipsize("ARCHIVE CABLE $versionName   ${I18n.t("about")}", about, w - 80), box.left + 40, box.bottom - 24, about)
     }
@@ -475,6 +583,7 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
     }
 
     private fun drawGrid(c: Canvas, now: Long) {
+        hits.clear()
         val windowEnd = windowStart + WINDOW_MS
         val pxPerMs = (GRID_RIGHT - GRID_LEFT) / WINDOW_MS.toFloat()
         fun xOf(t: Long) = GRID_LEFT + (t - windowStart) * pxPerMs
@@ -501,6 +610,7 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
             val selectedRow = idx == selRow
 
             val chanCell = RectF(CHAN_LEFT, top, CHAN_RIGHT, bottom)
+            hits += Hit(chanCell, idx, -1)
             Retro.bevel(c, chanCell, if (selectedRow) 0xFF2A4BA8.toInt() else Retro.CELL, Retro.CELL_LIGHT, Retro.CELL_SHADOW)
             fill.color = ch.color
             c.drawRect(chanCell.left + 4, chanCell.top + 4, chanCell.left + 16, chanCell.bottom - 4, fill)
@@ -526,6 +636,7 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
                 val r = minOf(xOf(cellData.end), GRID_RIGHT) - GAP / 2
                 if (r - l < 4) continue
                 val cell = RectF(l, top, r, bottom)
+                hits += Hit(cell, idx, cellData.start)
                 val isSel = selected != null && selected.start == cellData.start
                 val past = cellData.end <= now
                 when {
@@ -573,7 +684,7 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
         // Footer hints & scroll indicator.
         val footY = 1066f
         c.drawText("ARCHIVE CABLE", CHAN_LEFT, footY, brand)
-        c.drawText(I18n.t("guide_hints"), CHAN_LEFT + 250, footY, hintText)
+        c.drawText(I18n.t(if (touchMode) "guide_hints_touch" else "guide_hints"), CHAN_LEFT + 250, footY, hintText)
         val pageText = "${selRow + 1}/${channels.size}"
         c.drawText(pageText, GRID_RIGHT - hintText.measureText(pageText), footY, hintText)
     }
@@ -589,6 +700,7 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
         private const val ROW_H = 70f
         private const val GAP = 5f
         private const val VISIBLE_ROWS = 6
+        private const val SWIPE_MIN = 90f
         private const val SETUP_ROWS = 15
         private const val VISIBLE_SETUP_ROWS = 9
         private const val ROW_DECADE_FIRST = 6

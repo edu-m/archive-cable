@@ -62,6 +62,23 @@ class ScheduleTest {
         assertTrue(p is Playable.Media && p.isFiller)
     }
 
+    /** Regression: every instant across show boundaries must have something to play (no "stand by" flashes). */
+    @Test fun noStandByFlashesAtBoundaries() {
+        val odd = listOf(prog(1, 6.37), prog(2, 7.1234), prog(3, 22.5017), prog(4, 28.999), prog(5, 3.3333))
+        for (slot in listOf(0, 30)) {
+            val s = Schedule(def(slot), odd)
+            val t0 = System.currentTimeMillis()
+            for (a in s.airings(t0, t0 + 6 * 3600_000L)) {
+                var t = a.programEnd - 3000
+                while (t < a.end + 3000) {
+                    val p = s.playableAt(t, filler, emptySet())
+                    assertTrue("slot=$slot t=${t - a.programEnd}ms after program end: $p", p is Playable.Media)
+                    t += 97
+                }
+            }
+        }
+    }
+
     @Test fun parsesLengths() {
         assertEquals(1653220L, ArchiveApi.parseLength("1653.22"))
         assertEquals(1653000L, ArchiveApi.parseLength("27:33"))

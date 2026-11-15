@@ -26,7 +26,8 @@ class Schedule(private val def: ChannelDef, programs: List<Program>) {
     val size get() = programs.size
 
     private fun slotLength(durationMs: Long): Long {
-        if (slotMs <= 0) return ((durationMs + 999) / 1000) * 1000
+        // Back-to-back channels: the slot is exactly the program (rounding up left sub-second dead air).
+        if (slotMs <= 0) return durationMs.coerceAtLeast(1000)
         // Shows running a little long (credits) get trimmed instead of taking a whole extra slot.
         val effective = max(durationMs - OVERRUN_TOLERANCE_MS, 1)
         val slots = (effective + slotMs - 1) / slotMs
@@ -84,8 +85,17 @@ class Schedule(private val def: ChannelDef, programs: List<Program>) {
             val clipEnd = if (a.program.durationMs > a.end - a.start) a.end - a.start else null
             return Playable.Media(a.program, a, 0, clipEnd, t - a.start, isFiller = false)
         }
-        return fillerAt(a, t, if (brokenProgram) a.start else a.programEnd, filler, avoid)
+        // A sliver of dead air (shorter than any commercial) just rolls into the next show.
+        if (a.end - t < MIN_GAP_MS) return startOfNext(a, filler, avoid)
+        return when (val f = fillerAt(a, t, if (brokenProgram) a.start else a.programEnd, filler, avoid)) {
+            is Playable.StandBy -> if (f.untilMs - t < MIN_GAP_MS) startOfNext(a, filler, avoid) else f
+            else -> f
+        }
     }
+
+    /** The show after [a], from its first frame (the viewer ends up < [MIN_GAP_MS] behind live). */
+    private fun startOfNext(a: Airing, filler: List<Program>, avoid: Set<String>): Playable =
+        playableAt(a.end, filler, avoid)
 
     private fun fillerAt(a: Airing, t: Long, gapStart: Long, pool: List<Program>, avoid: Set<String>): Playable {
         if (pool.isEmpty()) return Playable.StandBy(a, a.end)
@@ -94,7 +104,10 @@ class Schedule(private val def: ChannelDef, programs: List<Program>) {
         var j = 0
         while (pos < a.end && j < 1000) {
             val p = pool[Math.floorMod(h + j, pool.size.toLong()).toInt()]
-            val len = minOf(p.durationMs, a.end - pos, MAX_FILLER_CHUNK_MS)
+            var len = minOf(p.durationMs, a.end - pos, MAX_FILLER_CHUNK_MS)
+            // Never leave a tail too short to fill: stretch this chunk to the end of the gap if it can.
+            val rest = a.end - pos - len
+            if (rest in 1 until MIN_GAP_MS && p.durationMs >= len + rest) len += rest
             if (len < 1000) break
             if (t < pos + len) {
                 if (p.url in avoid) return Playable.StandBy(a, pos + len)
@@ -113,6 +126,7 @@ class Schedule(private val def: ChannelDef, programs: List<Program>) {
         const val EPOCH = 1_704_067_200_000L
         private const val OVERRUN_TOLERANCE_MS = 150_000L
         private const val MAX_FILLER_CHUNK_MS = 180_000L
+        private const val MIN_GAP_MS = 2_000L
 
         fun mix(x: Long): Long {
             var z = x + -0x61c8864680b583ebL

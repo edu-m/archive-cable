@@ -47,6 +47,13 @@ object I18n {
             "en" to "UP/DOWN: CHANNEL   LEFT/RIGHT: TIME   OK: WATCH   BACK: EXIT",
             "it" to "SU/GIU: CANALE   SINISTRA/DESTRA: ORARIO   OK: GUARDA   INDIETRO: ESCI",
         ),
+        "guide_hints_touch" to mapOf(
+            "en" to "TAP: SELECT   TAP AGAIN: WATCH   SWIPE LEFT: SETUP   BACK: EXIT",
+            "it" to "TOCCA: SCEGLI   TOCCA ANCORA: GUARDA   SCORRI A SINISTRA: IMPOSTAZIONI",
+        ),
+        "setup_hint_touch" to mapOf("en" to "TAP A ROW, THEN ITS LEFT/RIGHT HALF TO CHANGE IT", "it" to "TOCCA UNA VOCE, POI LA META SINISTRA/DESTRA PER CAMBIARLA"),
+        "save" to mapOf("en" to "SAVE", "it" to "SALVA"),
+        "cancel" to mapOf("en" to "CANCEL", "it" to "ANNULLA"),
         "press_back_again" to mapOf("en" to "Press BACK again to turn off Archive Cable", "it" to "Premi di nuovo INDIETRO per spegnere Archive Cable"),
         "setup" to mapOf("en" to "SETUP", "it" to "IMPOSTAZIONI"),
         "setup_hint" to mapOf("en" to "UP/DOWN: ITEM   LEFT/RIGHT: CHANGE   OK: SAVE   BACK: CANCEL", "it" to "SU/GIU: VOCE   SINISTRA/DESTRA: CAMBIA   OK: SALVA   INDIETRO: ANNULLA"),

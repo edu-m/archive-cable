@@ -54,6 +54,20 @@ The app shows up in the TV launcher as **Archive Cable**. The first launch takes
 | INFO | Show the channel banner | |
 | Play/Pause | Pause; the channel stays behind live time until it changes | |
 
+## Touch screens (phones and tablets)
+
+Archive Cable also runs on Android phones and tablets (landscape). On screens that aren't 16:9 the picture is boxed to 16:9, like a TV.
+
+| Gesture | Watching TV | In the guide | In SETUP |
+|---|---|---|---|
+| Tap | Open the guide | Select a show; tap it again (or the preview) to watch | Select a row; tap again on its left/right half to change it |
+| Swipe left | −15 s | Open SETUP | Previous value |
+| Swipe right | +15 s | Jump back to "now" | Next value |
+| Swipe up / down | Channel up / down | Scroll the channel list | Scroll the rows |
+| Long-press | Channel banner | | |
+
+In SETUP, use the on-screen **SAVE** / **CANCEL** buttons, or tap outside the menu to cancel. The system Back gesture works like the remote's Back button.
+
 ## Setup menu (hidden)
 
 In the guide, press **Left three times** while the current program is selected. The **SETUP** menu opens. Up/Down picks a setting, Left/Right changes it, OK saves, Back cancels.
