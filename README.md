@@ -137,6 +137,11 @@ Archive Cable doesn't host, copy or redistribute any video. It plays files direc
 
 **Archive Cable is not affiliated with or endorsed by the Internet Archive.** It runs entirely on their free service and bandwidth, so if you enjoy it, please consider [donating to the Internet Archive](https://archive.org/donate).
 
+
 ## License
 
 [MIT](LICENSE) © 2026 edu-m. Bundled third-party components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). All channel idents, jingles and artwork are original and generated in code.
+
+# AI disclaimer
+
+This project has been worked on partly by AI, this means that an AI has been involved on some tasks on this codebase. Writing tests, refactoring functions, writing some comments and cleaning up the codebase are some of the tasks that have been delegated.
