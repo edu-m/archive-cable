@@ -1,0 +1,9 @@
+Archive Cable - https://github.com/edu-m/archive-cable
+Copyright (c) 2026 edu-m. Released under the MIT License.
+
+Includes:
+- VT323 font, Copyright 2011 The VT323 Project Authors, SIL Open Font License 1.1 (see VT323-OFL.txt)
+- AndroidX Media3, AndroidX Core, kotlinx.coroutines, Kotlin stdlib: Apache License 2.0
+  https://www.apache.org/licenses/LICENSE-2.0
+
+Video is streamed from the Internet Archive (archive.org). Not affiliated with the Internet Archive.
