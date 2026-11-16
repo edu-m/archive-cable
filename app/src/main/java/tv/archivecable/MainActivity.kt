@@ -1,6 +1,7 @@
 package tv.archivecable
 
 import android.app.Activity
+import android.content.Context
 import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
@@ -29,7 +30,10 @@ import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -46,6 +50,8 @@ class MainActivity : Activity() {
     private lateinit var staticView: StaticView
     private lateinit var bumper: BumperView
     private lateinit var settings: Settings
+    /** Auto volume: evens out near-silent and ear-piercing recordings. */
+    private val leveler = LevelerAudioProcessor()
     /** Display aspect ratio of the current video (0 = unknown). */
     private var videoRatio = 0f
     private lateinit var osd: OsdView
@@ -165,11 +171,12 @@ class MainActivity : Activity() {
             onTune = { idx -> closeGuide(); if (idx != current) tune(idx) else showOsd() }
             onClose = { closeGuide() }
             setupProvider = {
-                GuideView.SetupValues(I18n.code, settings.aspect, settings.transitions,
+                GuideView.SetupValues(I18n.code, settings.aspect, settings.transitions, settings.audioLeveling,
                     settings.overscan, settings.offsetX, settings.offsetY, settings.decadeFilter)
             }
             onSetupPreview = { v ->
                 applyAspect(v.aspect)
+                leveler.enabled = v.audioLeveling // audible right away while browsing
                 applyGeometry(v.overscan, v.offsetX, v.offsetY)
             }
             onSetupSave = { v -> saveSetup(v) }
@@ -193,7 +200,16 @@ class MainActivity : Activity() {
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(15_000, 60_000, 1_500, 3_000)
             .build()
-        player = ExoPlayer.Builder(this)
+        leveler.enabled = settings.audioLeveling
+        val renderers = object : DefaultRenderersFactory(this) {
+            override fun buildAudioSink(context: Context, enableFloatOutput: Boolean, enableAudioTrackPlaybackParams: Boolean): AudioSink =
+                DefaultAudioSink.Builder(context)
+                    .setAudioProcessors(arrayOf(leveler))
+                    .setEnableFloatOutput(false) // the leveler works on 16-bit PCM
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .build()
+        }
+        player = ExoPlayer.Builder(this, renderers)
             .setMediaSourceFactory(DefaultMediaSourceFactory(http))
             .setLoadControl(loadControl)
             .build()
@@ -284,6 +300,8 @@ class MainActivity : Activity() {
     private fun saveSetup(v: GuideView.SetupValues) {
         settings.aspect = v.aspect
         settings.transitions = v.transitions
+        settings.audioLeveling = v.audioLeveling
+        leveler.enabled = v.audioLeveling
         settings.overscan = v.overscan
         settings.offsetX = v.offsetX
         settings.offsetY = v.offsetY
@@ -456,8 +474,14 @@ class MainActivity : Activity() {
         handler.postDelayed(tuneNow, 2500)
     }
 
+    private var tickCount = 0
+
     private fun onTick() {
         val now = System.currentTimeMillis()
+        if (isDebuggable() && ++tickCount % 3 == 0 && player.isPlaying) {
+            val db = 20 * kotlin.math.log10(leveler.currentGain.toDouble().coerceAtLeast(1e-6))
+            android.util.Log.i("ArchiveCable", "auto volume ${"%+.1f".format(db)} dB on '${(playable as? Playable.Media)?.program?.title}'")
+        }
         val p = playable
         // Still the same channel: continue seamlessly so the next show gets its ident.
         if (p is Playable.StandBy && now >= p.untilMs) playLive(maxOf(now, p.untilMs + 50), seamless = true)

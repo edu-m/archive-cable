@@ -22,6 +22,7 @@ Turn it on and something is already playing: newscasts, newsreels, Computer Chro
 * **Decade filter**: put only the 80s and 90s (or any mix) on the air
 * **CRT ready**: auto 4:3 stretch, overscan and X/Y position calibration
 * **English and Italian**: changes the whole interface *and* the programming (TG, Carosello, Cartoni Animati…)
+* **Auto volume**: quiet VHS transfers and blaring commercials play at the same level
 * No account, no ads, no tracking
 
 ## Install
@@ -82,6 +83,7 @@ In the guide, press **Left three times** while the current program is selected. 
   * **ORIGINAL**: original shape, with black bars.
 * **Transitions**: turns the channel idents on or off (see below).
 * **Decades**: one checkbox per decade from the 1940s to the 2010s, plus **Undated items**. The 1940s box also covers anything older and the 2010s box anything newer. Only ticked decades are on the air. The filter is part of the Archive search, so each channel gets a full lineup from those decades; then each item's year is checked, using the year in the title when the year field is missing, or when the field looks like a later upload date. Commercials follow the same decades and fall back to any era if none are found. Saving reloads the lineup. Each combination is cached separately, so switching back is instant. Channels with nothing from your decades say so in the guide and are skipped by Up/Down. At least one box always stays ticked.
+* **Auto volume** (on by default): evens out Archive recordings that are nearly inaudible or ear-piercing. Each recording's loudness is measured continuously, ignoring low-frequency hum, and the volume is adjusted toward one common level (up to ±20 dB): loud audio is turned down within about 0.3 s, quiet audio is brought up over a couple of seconds, and near-silence is never boosted. A limiter keeps boosted audio from clipping, and each new tape is re-measured quickly. Turn it off for untouched original audio.
 * **Overscan (size)**, **Position X**, **Position Y**: set up the picture for a CRT. Size runs from 75% to 110% in 1% steps; X/Y move the picture up to ±10% in 0.5% steps. The video, guide, banners and idents all move and shrink together. While you adjust these, a calibration overlay appears (yellow edge, red corner brackets, center crosshair, 90% title-safe box): shrink until all four red corners are visible on the tube, then center the picture. Changes preview live; **0** resets the selected setting, OK saves, Back restores the previous values.
 
 **Using a CRT:** connect the box through an HDMI-to-composite (AV) converter, set Picture to AUTO, then calibrate Overscan and Position. If your box offers 480p/576p output (Settings → Display), use it so the converter has less scaling to do. Text is sized for a 1080-line layout, so it is still readable on a 480-line tube.

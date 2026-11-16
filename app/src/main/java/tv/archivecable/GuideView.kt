@@ -27,6 +27,8 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
         val language: String,
         val aspect: AspectMode,
         val transitions: Boolean,
+        /** Automatic volume leveling. */
+        val audioLeveling: Boolean,
         /** Whole-picture size in percent (CRT overscan compensation). */
         val overscan: Int,
         /** Whole-picture shift in tenths of a percent of the screen width/height. */
@@ -313,6 +315,7 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
                 cur.copy(aspect = modes[Math.floorMod(cur.aspect.ordinal + dir, modes.size)])
             }
             ROW_TRANSITIONS -> cur.copy(transitions = !cur.transitions)
+            ROW_AUDIO -> cur.copy(audioLeveling = !cur.audioLeveling)
             ROW_OVERSCAN -> cur.copy(overscan = (cur.overscan + dir).coerceIn(Settings.OVERSCAN_MIN, Settings.OVERSCAN_MAX))
             ROW_OFFSET_X -> cur.copy(offsetX = (cur.offsetX + dir * Settings.OFFSET_STEP).coerceIn(-Settings.OFFSET_MAX, Settings.OFFSET_MAX))
             ROW_OFFSET_Y -> cur.copy(offsetY = (cur.offsetY + dir * Settings.OFFSET_STEP).coerceIn(-Settings.OFFSET_MAX, Settings.OFFSET_MAX))
@@ -321,6 +324,7 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
         fun reset() = update(when (setupRow) {
             ROW_PICTURE -> cur.copy(aspect = AspectMode.AUTO)
             ROW_TRANSITIONS -> cur.copy(transitions = true)
+            ROW_AUDIO -> cur.copy(audioLeveling = true)
             ROW_OVERSCAN -> cur.copy(overscan = 100)
             ROW_OFFSET_X -> cur.copy(offsetX = 0)
             ROW_OFFSET_Y -> cur.copy(offsetY = 0)
@@ -402,6 +406,7 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
             I18n.t("row_language") to (I18n.LANGUAGES.firstOrNull { it.code == v.language }?.label ?: v.language),
             I18n.t("row_picture") to I18n.t(v.aspect.labelKey),
             I18n.t("row_transitions") to I18n.t(if (v.transitions) "on" else "off"),
+            I18n.t("row_audio") to I18n.t(if (v.audioLeveling) "on" else "off"),
             I18n.t("row_overscan") to "${v.overscan}%",
             I18n.t("row_offset_x") to pct(v.offsetX),
             I18n.t("row_offset_y") to pct(v.offsetY),
@@ -428,6 +433,7 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
             ROW_LANGUAGE -> I18n.t("language_note")
             ROW_PICTURE -> I18n.t(v.aspect.hintKey)
             ROW_TRANSITIONS -> I18n.t("transitions_hint")
+            ROW_AUDIO -> I18n.t("audio_hint")
             ROW_OVERSCAN -> I18n.t("overscan_hint")
             ROW_OFFSET_X, ROW_OFFSET_Y -> I18n.t("offset_hint")
             else -> I18n.t("decades_hint")
@@ -701,16 +707,17 @@ class GuideView(context: Context, private val repo: ChannelRepository) : View(co
         private const val GAP = 5f
         private const val VISIBLE_ROWS = 6
         private const val SWIPE_MIN = 90f
-        private const val SETUP_ROWS = 15
+        private const val SETUP_ROWS = 16
         private const val VISIBLE_SETUP_ROWS = 9
-        private const val ROW_DECADE_FIRST = 6
-        private const val ROW_UNDATED = 14
+        private const val ROW_DECADE_FIRST = 7
+        private const val ROW_UNDATED = 15
         private const val ROW_LANGUAGE = 0
         private const val ROW_PICTURE = 1
         private const val ROW_TRANSITIONS = 2
-        private const val ROW_OVERSCAN = 3
-        private const val ROW_OFFSET_X = 4
-        private const val ROW_OFFSET_Y = 5
+        private const val ROW_AUDIO = 3
+        private const val ROW_OVERSCAN = 4
+        private const val ROW_OFFSET_X = 5
+        private const val ROW_OFFSET_Y = 6
         private const val WINDOW_MS = 90 * 60_000L
         private const val MAX_AHEAD_MS = 24 * 3600_000L
     }

@@ -72,6 +72,8 @@ object I18n {
         "on" to mapOf("en" to "ON", "it" to "SI"),
         "off" to mapOf("en" to "OFF", "it" to "NO"),
         "transitions_hint" to mapOf("en" to "CHANNEL IDENTS AND JINGLES BETWEEN SHOWS", "it" to "SIGLE E JINGLE DEL CANALE TRA I PROGRAMMI"),
+        "row_audio" to mapOf("en" to "AUTO VOLUME", "it" to "VOLUME AUTOMATICO"),
+        "audio_hint" to mapOf("en" to "EVENS OUT VERY QUIET AND VERY LOUD RECORDINGS", "it" to "UNIFORMA REGISTRAZIONI TROPPO BASSE O TROPPO ALTE"),
         "row_overscan" to mapOf("en" to "OVERSCAN (SIZE)", "it" to "OVERSCAN (DIMENSIONE)"),
         "row_offset_x" to mapOf("en" to "POSITION X", "it" to "POSIZIONE X"),
         "row_offset_y" to mapOf("en" to "POSITION Y", "it" to "POSIZIONE Y"),

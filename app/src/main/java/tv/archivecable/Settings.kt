@@ -27,6 +27,11 @@ class Settings(context: Context) {
         get() = prefs.getBoolean("transitions", true)
         set(v) = prefs.edit().putBoolean("transitions", v).apply()
 
+    /** Automatic volume leveling between quiet and loud recordings. */
+    var audioLeveling: Boolean
+        get() = prefs.getBoolean("audio_leveling", true)
+        set(v) = prefs.edit().putBoolean("audio_leveling", v).apply()
+
     /** Whole-picture size in percent, to fit a CRT's visible area (overscan compensation). */
     var overscan: Int
         get() = prefs.getInt("overscan", 100).coerceIn(OVERSCAN_MIN, OVERSCAN_MAX)

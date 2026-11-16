@@ -13,7 +13,8 @@ import kotlin.math.sin
 /** Tiny synthesizer for channel idents: every jingle is generated from waveforms, no samples. */
 object Jingles {
     private const val RATE = 22050
-    private const val VOLUME = 0.30f
+    /** Peak level; keeps jingles near the auto-volume target (-20 dBFS RMS) instead of ~10 dB above it. */
+    private const val VOLUME = 0.14f
 
     private enum class Wave { SINE, SQUARE, TRIANGLE, SAW, NOISE }
 
